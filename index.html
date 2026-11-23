@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4fa3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VAT">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>Thai VAT Calculator</title>
+<style>
+/* Layout: single centred working card, input on top, three result rows below, baht-in-words footer */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --ink: #16202b;
+  --muted: #5d6b7a;
+  --line: #d8dee5;
+  --accent: #1f4fa3;
+  --accent-soft: #e3ebf8;
+  --good: #1d7a4c;
+  --font-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141a; --surface: #18202a; --ink: #e8edf2; --muted: #93a1b0;
+    --line: #2a3542; --accent: #7fa6ee; --accent-soft: #1e2d47; --good: #5cc48e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141a; --surface: #18202a; --ink: #e8edf2; --muted: #93a1b0;
+  --line: #2a3542; --accent: #7fa6ee; --accent-soft: #1e2d47; --good: #5cc48e;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-ui);
+  font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 48px;
+}
+.wrap { max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+header h1 { font-size: 1.35rem; font-weight: 700; margin: 0; text-wrap: balance; }
+header p { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border-radius: 10px; padding: 4px; gap: 4px; }
+.seg button {
+  font: inherit; font-weight: 600; font-size: 0.92rem; border: 0; border-radius: 7px; padding: 9px 6px;
+  background: transparent; color: var(--muted); cursor: pointer; line-height: 1.25;
+}
+.seg button small { display: block; font-weight: 400; font-size: 0.75rem; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.seg button:focus-visible, .rates button:focus-visible, .row:focus-visible, .clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+label.lbl { font-size: 0.8rem; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
+.amount { display: flex; align-items: center; gap: 8px; border: 2px solid var(--line); border-radius: 12px; padding: 6px 10px 6px 14px; background: var(--surface); }
+.amount:focus-within { border-color: var(--accent); }
+.amount span.cur { font-family: var(--font-num); font-size: 1.6rem; color: var(--muted); }
+.amount input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink);
+  font-family: var(--font-num); font-size: 2rem; font-weight: 600; padding: 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+.clear { font: inherit; font-size: 0.8rem; border: 0; background: var(--bg); color: var(--muted); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.rates { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rates button {
+  font: inherit; font-size: 0.85rem; font-weight: 600; border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-family: var(--font-num);
+}
+.rates button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.rates input { width: 72px; font-family: var(--font-num); font-size: 0.85rem; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: var(--surface); color: var(--ink); }
+.rates .hint { font-size: 0.78rem; color: var(--muted); }
+
+.results { display: flex; flex-direction: column; }
+.row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 12px 4px; border-top: 1px solid var(--line); cursor: pointer; border-radius: 6px;
+  background: transparent; border-left: 0; border-right: 0; border-bottom: 0; font: inherit; color: inherit; text-align: left; width: 100%;
+}
+.row:first-child { border-top: 0; }
+.row .k { display: flex; flex-direction: column; }
+.row .k b { font-weight: 600; font-size: 0.95rem; }
+.row .k small { color: var(--muted); font-size: 0.78rem; }
+.row .v { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 1.15rem; font-weight: 500; white-space: nowrap; }
+.row.main { background: var(--accent-soft); padding: 14px 12px; border-top-color: transparent; }
+.row.main + .row { border-top-color: transparent; }
+.row.main .v { font-size: 1.6rem; font-weight: 600; color: var(--accent); }
+.row.main .k b { color: var(--accent); }
+.row .copied { font-family: var(--font-ui); font-size: 0.75rem; color: var(--good); font-weight: 600; margin-right: 8px; }
+
+.words { font-size: 0.85rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 12px; }
+.words span { color: var(--ink); }
+.foot { font-size: 0.78rem; color: var(--muted); text-align: center; }
+@media (prefers-reduced-motion: no-preference) { .row { transition: background .15s; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Thai VAT Calculator</h1>
+    <p>คำนวณภาษีมูลค่าเพิ่ม · type a number, get the answer</p>
+  </header>
+
+  <div class="card">
+    <div class="seg" role="group" aria-label="What is the number you have?">
+      <button id="mode-inc" type="button" aria-pressed="true">Price includes VAT<small>รวม VAT แล้ว → หาราคาก่อนภาษี</small></button>
+      <button id="mode-add" type="button" aria-pressed="false">Add VAT on top<small>ยังไม่รวม VAT → บวกภาษี</small></button>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="amt" id="amt-label">Price including VAT</label>
+      <div class="amount">
+        <span class="cur">฿</span>
+        <input id="amt" type="text" inputmode="decimal" autocomplete="off" value="1,070" aria-describedby="amt-label">
+        <button class="clear" id="clear" type="button">Clear</button>
+      </div>
+    </div>
+
+    <div class="rates" role="group" aria-label="VAT rate">
+      <button type="button" data-rate="7" aria-pressed="true">7%</button>
+      <button type="button" data-rate="10" aria-pressed="false">10%</button>
+      <input id="rate-custom" type="text" inputmode="decimal" placeholder="other %" aria-label="Custom VAT rate in percent">
+      <span class="hint">Thailand standard rate is 7%</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="results" id="results">
+      <button class="row" type="button" id="r-before"><span class="k"><b>Before VAT</b><small>ราคาก่อน VAT</small></span><span class="v">฿0.00</span></button>
+      <button class="row" type="button" id="r-vat"><span class="k"><b id="vat-label">VAT 7%</b><small>ภาษีมูลค่าเพิ่ม</small></span><span class="v">฿0.00</span></button>
+      <button class="row" type="button" id="r-total"><span class="k"><b>Total incl. VAT</b><small>ราคารวม VAT</small></span><span class="v">฿0.00</span></button>
+    </div>
+    <div class="words">ยอดรวมเป็นตัวอักษร: <span id="words">–</span></div>
+  </div>
+
+  <p class="foot">Tap any result to copy it. Amounts are rounded to the satang (0.01 ฿).</p>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const amt = $("amt"), rateCustom = $("rate-custom");
+  let mode = "inc", rate = 7;
+
+  try {
+    const s = JSON.parse(localStorage.getItem("thaiVat") || "{}");
+    if (s.mode === "inc" || s.mode === "add") mode = s.mode;
+    if (typeof s.rate === "number" && s.rate >= 0 && s.rate < 100) rate = s.rate;
+  } catch (e) {}
+  const save = () => { try { localStorage.setItem("thaiVat", JSON.stringify({ mode, rate })); } catch (e) {} };
+
+  const parse = (str) => {
+    const clean = String(str).replace(/[,\s฿]/g, "");
+    if (clean === "" || isNaN(clean)) return null;
+    return Number(clean);
+  };
+  const fmt = (satang) => "฿" + (satang / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Thai baht text (like Excel BAHTTEXT)
+  const D = ["", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
+  const P = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน"];
+  function group(n, hasHigher) { // n < 1,000,000
+    const s = String(n); let out = "";
+    for (let i = 0; i < s.length; i++) {
+      const d = +s[i], pos = s.length - 1 - i;
+      if (d === 0) continue;
+      if (pos === 1 && d === 1) out += "สิบ";
+      else if (pos === 1 && d === 2) out += "ยี่สิบ";
+      else if (pos === 0 && d === 1 && (s.length > 1 || hasHigher)) out += "เอ็ด";
+      else out += D[d] + P[pos];
+    }
+    return out;
+  }
+  function words(n) {
+    if (n === 0) return "ศูนย์";
+    let out = "", higher = false;
+    const parts = [];
+    while (n > 0) { parts.unshift(n % 1000000); n = Math.floor(n / 1000000); }
+    parts.forEach((p, i) => {
+      if (p) out += group(p, higher && i > 0);
+      if (i < parts.length - 1) out += "ล้าน";
+      higher = true;
+    });
+    return out;
+  }
+  function bahtText(satang) {
+    const b = Math.floor(satang / 100), s = satang % 100;
+    if (b === 0 && s === 0) return "ศูนย์บาทถ้วน";
+    let t = b > 0 ? words(b) + "บาท" : "";
+    t += s === 0 ? "ถ้วน" : words(s) + "สตางค์";
+    return t;
+  }
+
+  function render() {
+    $("mode-inc").setAttribute("aria-pressed", mode === "inc");
+    $("mode-add").setAttribute("aria-pressed", mode === "add");
+    $("amt-label").textContent = mode === "inc" ? "Price including VAT" : "Price before VAT";
+    document.querySelectorAll(".rates button").forEach(b => b.setAttribute("aria-pressed", Number(b.dataset.rate) === rate && rateCustom.value === ""));
+    $("vat-label").textContent = "VAT " + rate + "%";
+
+    $("r-before").classList.toggle("main", mode === "inc");
+    $("r-total").classList.toggle("main", mode === "add");
+
+    const v = parse(amt.value);
+    const rows = { before: $("r-before"), vat: $("r-vat"), total: $("r-total") };
+    if (v === null || v < 0) {
+      Object.values(rows).forEach(r => r.querySelector(".v").textContent = "฿0.00");
+      $("words").textContent = "–";
+      return;
+    }
+    const cents = Math.round(v * 100);
+    let before, vat, total;
+    if (mode === "inc") {
+      total = cents;
+      before = Math.round(cents * 100 / (100 + rate));
+      vat = total - before;
+    } else {
+      before = cents;
+      vat = Math.round(cents * rate / 100);
+      total = before + vat;
+    }
+    rows.before.querySelector(".v").textContent = fmt(before);
+    rows.vat.querySelector(".v").textContent = fmt(vat);
+    rows.total.querySelector(".v").textContent = fmt(total);
+    rows.before.dataset.copy = (before / 100).toFixed(2);
+    rows.vat.dataset.copy = (vat / 100).toFixed(2);
+    rows.total.dataset.copy = (total / 100).toFixed(2);
+    $("words").textContent = bahtText(total);
+  }
+
+  function setMode(m) { mode = m; save(); render(); amt.focus(); }
+  $("mode-inc").addEventListener("click", () => setMode("inc"));
+  $("mode-add").addEventListener("click", () => setMode("add"));
+
+  amt.addEventListener("input", render);
+  amt.addEventListener("blur", () => {
+    const v = parse(amt.value);
+    if (v !== null) amt.value = v.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  });
+  amt.addEventListener("focus", () => amt.select());
+  $("clear").addEventListener("click", () => { amt.value = ""; render(); amt.focus(); });
+
+  document.querySelectorAll(".rates button").forEach(b => b.addEventListener("click", () => {
+    rate = Number(b.dataset.rate); rateCustom.value = ""; save(); render();
+  }));
+  rateCustom.addEventListener("input", () => {
+    const r = parse(rateCustom.value.replace("%", ""));
+    if (r !== null && r >= 0 && r < 100) { rate = r; save(); }
+    else if (rateCustom.value === "") { rate = 7; save(); }
+    render();
+  });
+  if (rate !== 7 && rate !== 10) rateCustom.value = String(rate);
+
+  document.querySelectorAll(".row").forEach(row => row.addEventListener("click", async () => {
+    const val = row.dataset.copy; if (!val) return;
+    let ok = false;
+    try { await navigator.clipboard.writeText(val); ok = true; } catch (e) {}
+    const v = row.querySelector(".v");
+    if (!ok) { const r = document.createRange(); r.selectNodeContents(v); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return; }
+    const tag = document.createElement("span"); tag.className = "copied"; tag.textContent = "Copied";
+    v.prepend(tag); setTimeout(() => tag.remove(), 1200);
+  }));
+
+  render();
+})();
+</script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+</body>
+</html>
